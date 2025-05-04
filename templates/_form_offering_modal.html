@@ -1,0 +1,45 @@
+<div class="modal fade" id="offeringModal" tabindex="-1" aria-labelledby="offeringModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="offeringModalLabel">Registrar Nueva Ofrenda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            {# La action por defecto es para agregar. El JS la cambiará para editar. #}
+            <form action="{{ url_for('add_offering') }}" method="post">
+                <div class="modal-body">
+                    {# Campo oculto para guardar el offering_id en caso de edición #}
+                    <input type="hidden" id="offering_id" name="offering_id" value="">
+
+                    <div class="mb-3">
+                        <label for="offering_amount" class="form-label">Monto ($)</label>
+                        <input type="text" inputmode="decimal" pattern="[0-9]+([,\\.][0-9]+)?" class="form-control" id="offering_amount" name="offering_amount" required placeholder="Ej: 150.50">
+                    </div>
+                    <div class="mb-3">
+                        <label for="offering_date" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="offering_date" name="offering_date" required value="{{ now()|strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="offering_leader" class="form-label">Líder</label>
+                        <select class="form-select" id="offering_leader" name="offering_leader" required>
+                            <option value="" selected disabled>-- Seleccione un Líder --</option>
+                            {# Las opciones de líderes se cargan aquí usando la función global #}
+                            {% for leader in get_all_leaders() %}
+                                <option value="{{ leader.id }}">{{ leader.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar Ofrenda</button> {# Texto y clase se ajustarán con JS #}
+                </div>
+                {# Campos ocultos para mantener los filtros de historial al redirigir #}
+                {# Estos se llenarán con JavaScript al abrir el modal desde la página de historial #}
+                 <input type="hidden" name="start_date" id="modal_start_date">
+                 <input type="hidden" name="end_date" id="modal_end_date">
+                 <input type="hidden" name="leader_id_filter" id="modal_leader_id_filter">
+            </form>
+        </div>
+    </div>
+</div>

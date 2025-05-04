@@ -1,0 +1,34 @@
+<div class="modal fade" id="leaderModal" tabindex="-1" aria-labelledby="leaderModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="leaderModalLabel">Agregar Líder</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form action="{{ url_for('add_leader') }}" method="post">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="leader_name" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="leader_name" name="leader_name" required>
+          </div>
+          <div class="mb-3">
+            <label for="leader_direccion" class="form-label">Dirección</label>
+            <input type="text" class="form-control" id="leader_direccion" name="leader_direccion">
+          </div>
+          <div class="mb-3">
+            <label for="leader_dia" class="form-label">Día</label>
+            <input type="text" class="form-control" id="leader_dia" name="leader_dia">
+          </div>
+          <div class="mb-3">
+            <label for="leader_hora" class="form-label">Hora</label>
+            <input type="text" class="form-control" id="leader_hora" name="leader_hora">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

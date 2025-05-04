@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Histórico de Ofrendas - Sistema de Ofrendas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
+    <h1 class="h2 fw-bold">Histórico de Ofrendas</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if history %}
+        <a href="{{ url_for('export_history', start_month=start_month, end_month=end_month, year=year, leader_id=selected_leader_id) }}" class="btn btn-sm btn-outline-success shadow">
+            <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<form method="get" action="{{ url_for('view_history') }}" class="row g-3 mb-4 p-3 border rounded bg-light shadow-sm" id="filterForm">
+    <div class="col-md-4">
+        <label class="form-label">Desde Mes:</label>
+        <select class="form-select form-select-sm" id="start_month" name="start_month"></select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Hasta Mes:</label>
+        <select class="form-select form-select-sm" id="end_month" name="end_month"></select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Año:</label>
+        <select class="form-select form-select-sm" id="year" name="year"></select>
+    </div>
+    <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary btn-sm shadow"><i class="bi bi-filter"></i> Aplicar Filtros</button>
+        <a href="{{ url_for('view_history') }}" class="btn btn-secondary btn-sm ms-2 shadow"><i class="bi bi-x-circle"></i> Limpiar Filtros</a>
+    </div>
+</form>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <label for="rowsPerPage" class="me-2 mb-0">Mostrar:</label>
+    <select id="rowsPerPage" class="form-select form-select-sm w-auto">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="1000">Todos</option>
+    </select>
+</div>
+
+{% if history %}
+<div class="table-responsive shadow rounded-4 overflow-hidden">
+    <table class="table table-hover align-middle mb-0" id="historyTable">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Fecha</th>
+                <th>Líder</th>
+                <th class="text-end">Monto ($)</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in history %}
+            <tr>
+                <td class="row-number">{{ loop.index }}</td>
+                <td>{{ record.date }}</td>
+                <td><strong>{{ record.leader_name }}</strong></td>
+                <td class="text-end">${{ "%.2f"|format(record.amount|float) }}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-outline-primary btn-sm me-1 edit-offering-btn" data-bs-toggle="modal" data-bs-target="#offeringModal"
+                            data-offering-id="{{ record.id }}"
+                            data-offering-amount="{{ record.amount }}"
+                            data-offering-date="{{ record.date }}"
+                            data-offering-leader-id="{{ record.leader_id }}">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <form action="{{ url_for('delete_offering', offering_id=record.id) }}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar esta ofrenda?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="table-light">
+                <td colspan="3" class="text-end fw-bold">Total Filtrado:</td>
+                <td class="text-end fw-bold">${{ "%.2f"|format(total_amount) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<div class="text-center mt-4">
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+</div>
+{% else %}
+<div class="alert alert-info shadow-sm rounded-3">No hay registros de ofrendas que coincidan con los filtros seleccionados.</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts_extra %}
+{{ super() }}
+<script>
+const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+function populateMonthSelect(selectId, selectedValue) {
+    const select = document.getElementById(selectId);
+    monthNames.forEach((name, index) => {
+        const opt = document.createElement('option');
+        opt.value = index + 1;
+        opt.textContent = name;
+        select.appendChild(opt);
+    });
+    if (selectedValue) {
+        select.value = selectedValue;
+    }
+}
+
+function populateYearSelect(selectId, selectedValue) {
+    const select = document.getElementById(selectId);
+    const currentYear = new Date().getFullYear();
+    for (let y = currentYear - 5; y <= currentYear + 5; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        select.appendChild(opt);
+    }
+    if (selectedValue) {
+        select.value = selectedValue;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    let prevMonth = currentMonth - 1;
+    let yearForPrevMonth = currentYear;
+    if (prevMonth === 0) {
+        prevMonth = 12;
+        yearForPrevMonth = currentYear - 1;
+    }
+
+    populateMonthSelect('start_month', {{ start_month|default(prevMonth) }});
+    populateMonthSelect('end_month', {{ end_month|default(currentMonth) }});
+    populateYearSelect('year', {{ year|default(yearForPrevMonth) }});
+});
+</script>
+{% endblock %}
+

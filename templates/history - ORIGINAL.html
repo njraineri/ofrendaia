@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block title %}Histórico de Ofrendas - Sistema de Ofrendas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Histórico de Ofrendas</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+         {% if history %}
+         <a href="{{ url_for('export_history', start_date=start_date, end_date=end_date, leader_id=selected_leader_id) }}" class="btn btn-sm btn-outline-success">
+             <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+         </a>
+         {% endif %}
+         {# El botón para Registrar Ofrenda está en base.html y abre el modal #}
+    </div>
+</div>
+
+<form method="get" action="{{ url_for('view_history') }}" class="row g-3 mb-4 p-3 border rounded bg-light" id="filterForm">
+    <div class="col-md-4">
+        <label for="start_date" class="form-label">Desde Fecha:</label>
+        <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date }}">
+    </div>
+    <div class="col-md-4">
+        <label for="end_date" class="form-label">Hasta Fecha:</label>
+        <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" value="{{ end_date }}">
+    </div>
+    <div class="col-md-4">
+        <label for="leader_id" class="form-label">Líder:</label>
+        <select class="form-select form-select-sm" id="leader_id" name="leader_id">
+            <option value="all" {% if selected_leader_id == 'all' %}selected{% endif %}>Todos</option>
+            {% for leader in leaders %}
+                <option value="{{ leader.id }}" {% if selected_leader_id|string == leader.id|string %}selected{% endif %}>{{ leader.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+     <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-filter"></i> Aplicar Filtros</button>
+         {% if start_date or end_date or selected_leader_id != 'all' %}
+         <a href="{{ url_for('view_history') }}" class="btn btn-secondary btn-sm ms-2"><i class="bi bi-x-circle"></i> Limpiar Filtros</a>
+         {% endif %}
+    </div>
+</form>
+
+
+{% if history %}
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+        <thead>
+            <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Líder</th>
+                <th scope="col" class="text-end">Monto ($)</th>
+                 <th scope="col" class="text-center">Acciones</th> {# Nueva columna #}
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in history %}
+            <tr>
+                <td>{{ record.date }}</td>
+                <td>{{ record.leader_name }}</td>
+                <td class="text-end">${{ "%.2f"|format(record.amount|float) }}</td>
+                 <td class="table-actions text-center"> {# Botones de acción #}
+                     <button type="button" class="btn btn-sm btn-primary edit-offering-btn"
+                             data-bs-toggle="modal"
+                             data-bs-target="#offeringModal" {# Usamos el mismo modal #}
+                             data-offering-id="{{ record.id }}"
+                             data-offering-amount="{{ record.amount }}"
+                             data-offering-date="{{ record.date }}"
+                             data-offering-leader-id="{{ record.leader_id }}">
+                         <i class="bi bi-pencil"></i> Editar
+                     </button>
+                     <form action="{{ url_for('delete_offering', offering_id=record.id) }}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar esta ofrenda?');">
+                         <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Eliminar</button>
+                     </form>
+                 </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+         {# Fila del total - Ahora usamos la variable total_amount pasada desde Flask #}
+         <tfoot>
+             <tr class="table-light">
+                 <td colspan="2" class="text-end fw-bold">Total Filtrado:</td> {# Texto más claro #}
+                 <td class="text-end fw-bold">${{ "%.2f"|format(total_amount) }}</td> {# >>> MOSTRAR VARIABLE PASADA <<< #}
+                 <td></td> {# Columna vacía para acciones en el total #}
+             </tr>
+         </tfoot>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">No hay registros de ofrendas que coincidan con los filtros seleccionados.</div>
+{% endif %}
+
+{# El modal de ofrenda está incluido en base.html #}
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    // Script para manejar la edición de ofrendas con el modal
+
+    const offeringModal = document.getElementById('offeringModal');
+    const offeringModalLabel = document.getElementById('offeringModalLabel');
+    const offeringForm = offeringModal ? offeringModal.querySelector('form') : null;
+    const offeringIdInput = offeringModal ? offeringModal.querySelector('#offering_id') : null;
+    const offeringAmountInput = offeringModal ? offeringModal.querySelector('#offering_amount') : null;
+    const offeringDateInput = offeringModal ? offeringModal.querySelector('#offering_date') : null;
+    const offeringLeaderSelect = offeringModal ? offeringModal.querySelector('#offering_leader') : null;
+    const offeringSubmitButton = offeringModal ? offeringModal.querySelector('button[type="submit"]') : null;
+
+    // Campos ocultos para los filtros de historial
+    const modalStartDateInput = offeringModal ? offeringModal.querySelector('#modal_start_date') : null;
+    const modalEndDateInput = offeringModal ? offeringModal.querySelector('#modal_end_date') : null;
+    const modalLeaderIdFilterInput = offeringModal ? offeringModal.querySelector('#modal_leader_id_filter') : null;
+
+    // Obtener los valores actuales de los filtros de historial
+    const currentStartDate = document.getElementById('start_date')?.value || '';
+    const currentEndDate = document.getElementById('end_date')?.value || '';
+    const currentLeaderIdFilter = document.getElementById('leader_id')?.value || 'all';
+
+
+    if (offeringModal) {
+        offeringModal.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget; // Botón que activó el modal
+            const isEditButton = button.classList.contains('edit-offering-btn'); // Identificar si es botón de editar
+
+            // Llenar campos ocultos con los filtros actuales del historial
+            if (modalStartDateInput) modalStartDateInput.value = currentStartDate;
+            if (modalEndDateInput) modalEndDateInput.value = currentEndDate;
+            if (modalLeaderIdFilterInput) modalLeaderIdFilterInput.value = currentLeaderIdFilter;
+
+            if (isEditButton) {
+                // --- Modo Edición ---
+                const offeringId = button.getAttribute('data-offering-id');
+                const offeringAmount = button.getAttribute('data-offering-amount');
+                const offeringDate = button.getAttribute('data-offering-date');
+                const offeringLeaderId = button.getAttribute('data-offering-leader-id');
+
+                if (offeringModalLabel) offeringModalLabel.textContent = 'Editar Ofrenda';
+                // Actualizar la acción del formulario para apuntar a la ruta de edición
+                if (offeringForm) offeringForm.action = "{{ url_for('edit_offering', offering_id=0) }}".replace('0', offeringId);
+
+                // Llenar los campos del formulario con los datos de la ofrenda
+                if (offeringIdInput) offeringIdInput.value = offeringId; // Guardar el ID en el campo oculto
+                if (offeringAmountInput) offeringAmountInput.value = offeringAmount;
+                if (offeringDateInput) offeringDateInput.value = offeringDate;
+                if (offeringLeaderSelect) offeringLeaderSelect.value = offeringLeaderId; // Seleccionar el líder correcto
+
+                if (offeringSubmitButton) {
+                     offeringSubmitButton.textContent = 'Guardar Cambios';
+                     offeringSubmitButton.classList.remove('btn-primary');
+                     offeringSubmitButton.classList.add('btn-success'); // O mantener primary, a gusto
+                }
+
+            } else {
+                // --- Modo Agregar (cuando se abre desde el botón "Registrar Ofrenda" en la navbar o similar) ---
+                // En este caso, la acción del formulario ya está correcta por defecto en el HTML.
+                // Solo necesitamos resetear el modal para la entrada de nuevos datos.
+                 if (offeringModalLabel) offeringModalLabel.textContent = 'Registrar Nueva Ofrenda';
+                 if (offeringIdInput) offeringIdInput.value = ''; // Limpiar el ID
+                 if (offeringAmountInput) offeringAmountInput.value = ''; // Limpiar campos
+                 // La fecha por defecto ya se carga en el template
+                 if (offeringLeaderSelect) {
+                     offeringLeaderSelect.value = ''; // Resetear selección de líder
+                     // Asegurarse de que la opción por defecto "-- Seleccione un Líder --" esté seleccionada visualmente
+                     offeringLeaderSelect.selectedIndex = 0;
+                 }
+
+                 if (offeringSubmitButton) {
+                     offeringSubmitButton.textContent = 'Registrar Ofrenda';
+                     offeringSubmitButton.classList.remove('btn-success');
+                     offeringSubmitButton.classList.add('btn-primary');
+                 }
+            }
+        });
+
+        // Limpiar el formulario y resetear el estado al cerrar el modal
+        offeringModal.addEventListener('hidden.bs.modal', event => {
+             const modalForm = offeringModal.querySelector('form');
+             modalForm.reset(); // Resetea todos los campos del formulario
+
+             // Limpiar campos ocultos de filtros (aunque reset() debería hacerlo)
+             if (modalStartDateInput) modalStartDateInput.value = '';
+             if (modalEndDateInput) modalEndDateInput.value = '';
+             if (modalLeaderIdFilterInput) modalLeaderIdFilterInput.value = 'all';
+
+             // Restaurar la acción del formulario a la de agregar por defecto (ya está en el HTML, pero lo reconfirmamos)
+             if (offeringForm) offeringForm.action = "{{ url_for('add_offering') }}";
+             // Restaurar el título y el texto del botón a "Agregar" por defecto
+             if (offeringModalLabel)  offeringModalLabel.textContent = 'Registrar Nueva Ofrenda';
+             if (offeringSubmitButton) {
+                 offeringSubmitButton.textContent = 'Registrar Ofrenda';
+                 offeringSubmitButton.classList.remove('btn-success');
+                 offeringSubmitButton.classList.add('btn-primary');
+             }
+        });
+    }
+
+
+    // Script para asegurar que la fecha final no sea anterior a la inicial (opcional, mejora UX)
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+
+    if(startDateInput && endDateInput) {
+        startDateInput.addEventListener('change', function() {
+            if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
+                endDateInput.value = startDateInput.value; // Ajusta fecha final si es necesario
+            }
+            endDateInput.min = startDateInput.value; // Establece mínimo para fecha final
+        });
+
+         endDateInput.addEventListener('change', function() {
+            if (startDateInput.value && endDateInput.value && endDateInput.value < startDateInput.value) {
+                startDateInput.value = endDateInput.value; // Ajusta fecha inicial si es necesario
+            }
+        });
+        // Establecer mínimo inicial al cargar la página si hay fecha de inicio
+         if (startDateInput.value) {
+             endDateInput.min = startDateInput.value;
+         }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% block title %}ABM Líderes - Sistema de Ofrendas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
+    <h1 class="h2 fw-bold">Administrar Líderes</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <button type="button" class="btn btn-success btn-sm shadow" data-bs-toggle="modal" data-bs-target="#leaderModal" data-bs-action="add">
+            <i class="bi bi-plus-lg"></i> Agregar Líder
+        </button>
+    </div>
+</div>
+
+<form method="get" action="{{ url_for('manage_leaders') }}" class="mb-4">
+    <div class="input-group shadow-sm mb-2">
+        <input type="text" class="form-control rounded-start-pill" placeholder="Buscar líder por nombre..." name="search" value="{{ search_term or '' }}">
+        <button class="btn btn-outline-primary rounded-end-pill" type="submit"><i class="bi bi-search"></i> Buscar</button>
+        {% if search_term %}
+        <a href="{{ url_for('manage_leaders') }}" class="btn btn-outline-danger rounded-pill" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></a>
+        {% endif %}
+    </div>
+</form>
+
+<div class="d-flex justify-content-end mb-3">
+    <div class="btn-group shadow-sm">
+        <button class="btn btn-outline-secondary btn-sm" id="sortNameBtn"><i class="bi bi-sort-alpha-down" id="nameSortIcon"></i> Ordenar por Nombre</button>
+        <button class="btn btn-outline-secondary btn-sm" id="sortDayBtn"><i class="bi bi-sort-alpha-down" id="daySortIcon"></i> Ordenar por Día</button>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <label for="rowsPerPage" class="me-2 mb-0">Mostrar:</label>
+    <select id="rowsPerPage" class="form-select form-select-sm w-auto">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="1000">Todos</option>
+    </select>
+</div>
+
+{% if leaders %}
+<div class="table-responsive shadow rounded-4 overflow-hidden">
+    <table class="table table-hover align-middle mb-0" id="leadersTable">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Dirección</th>
+                <th>Día</th>
+                <th>Hora</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for leader in leaders %}
+            <tr class="leader-row">
+                <td class="row-number">{{ loop.index }}</td>
+                <td><strong>{{ leader.name }}</strong></td>
+                <td>{{ leader.direccion or '-' }}</td>
+                <td>{{ leader.dia or '-' }}</td>
+                <td>{{ leader.hora or '-' }}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#leaderModal" data-bs-action="edit"
+                            data-bs-leader-id="{{ leader.id }}"
+                            data-bs-leader-name="{{ leader.name }}"
+                            data-bs-leader-direccion="{{ leader.direccion }}"
+                            data-bs-leader-dia="{{ leader.dia }}"
+                            data-bs-leader-hora="{{ leader.hora }}">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <form action="{{ url_for('delete_leader', leader_id=leader.id) }}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar al líder {{ leader.name }}? Esta acción también eliminará todas sus ofrendas asociadas.');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="text-center mt-4">
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+</div>
+
+{% else %}
+<div class="alert alert-info shadow-sm rounded-3">No hay líderes registrados o no se encontraron coincidencias para la búsqueda.</div>
+{% endif %}
+
+{% include '_form_leader_modal.html' %}
+{% endblock %}
+
+{% block scripts_extra %}
+{{ super() }}
+<style>
+    .highlight-col {
+        background-color: #e8f0fe !important;
+        transition: background-color 0.4s ease;
+    }
+</style>
+<script>
+    const rowsPerPageSelector = document.getElementById('rowsPerPage');
+    const pagination = document.getElementById('pagination');
+    let rowsPerPage = parseInt(rowsPerPageSelector.value);
+
+    const table = document.getElementById('leadersTable');
+    const tbody = table.tBodies[0];
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+
+    const sortNameBtn = document.getElementById('sortNameBtn');
+    const sortDayBtn = document.getElementById('sortDayBtn');
+    const nameSortIcon = document.getElementById('nameSortIcon');
+    const daySortIcon = document.getElementById('daySortIcon');
+
+    let nameAsc = true;
+    let dayAsc = true;
+
+    function clearHighlights() {
+        document.querySelectorAll('#leadersTable tbody tr').forEach(row => {
+            row.querySelectorAll('td').forEach(cell => cell.classList.remove('highlight-col'));
+        });
+    }
+
+    function highlightColumn(colIndex) {
+        document.querySelectorAll('#leadersTable tbody tr').forEach(row => {
+            row.querySelectorAll('td')[colIndex].classList.add('highlight-col');
+        });
+    }
+
+    function renumberRows() {
+        const visibleRows = allRows.filter(row => row.style.display !== 'none');
+        visibleRows.forEach((row, index) => {
+            row.querySelector('.row-number').textContent = index + 1;
+        });
+    }
+
+    function showPage(page, rowsPerPage) {
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+
+        allRows.forEach((row, index) => {
+            row.style.display = (index >= start && index < end) ? '' : 'none';
+        });
+
+        renumberRows();
+    }
+
+    function setupPagination(rowsPerPage) {
+        pagination.innerHTML = '';
+        const pageCount = Math.ceil(allRows.length / rowsPerPage);
+
+        if (rowsPerPage >= allRows.length) {
+            allRows.forEach(row => row.style.display = '');
+            pagination.style.display = 'none';
+            renumberRows();
+            return;
+        } else {
+            pagination.style.display = '';
+        }
+
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        prevLi.innerHTML = `<a class="page-link" href="#">Anterior</a>`;
+        pagination.appendChild(prevLi);
+
+        for (let i = 1; i <= pageCount; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            pagination.appendChild(li);
+        }
+
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        nextLi.innerHTML = `<a class="page-link" href="#">Siguiente</a>`;
+        pagination.appendChild(nextLi);
+
+        const pageLinks = pagination.querySelectorAll('.page-item');
+
+        let currentPage = 1;
+
+        function updatePagination() {
+            pageLinks.forEach(link => link.classList.remove('active'));
+            pageLinks[currentPage].classList.add('active');
+            showPage(currentPage, rowsPerPage);
+        }
+
+        pageLinks.forEach((li, index) => {
+            li.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (index === 0 && currentPage > 1) currentPage--;
+                else if (index === pageLinks.length - 1 && currentPage < pageCount) currentPage++;
+                else if (index > 0 && index < pageLinks.length - 1) currentPage = index;
+                updatePagination();
+            });
+        });
+
+        updatePagination();
+    }
+
+    rowsPerPageSelector.addEventListener('change', function() {
+        rowsPerPage = parseInt(this.value);
+        setupPagination(rowsPerPage);
+    });
+
+    function sortTable(columnIndex, asc, iconElement) {
+        const sortedRows = [...allRows].sort((a, b) => {
+            const aText = a.children[columnIndex].textContent.trim().toLowerCase();
+            const bText = b.children[columnIndex].textContent.trim().toLowerCase();
+            return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+        });
+
+        sortedRows.forEach(row => tbody.appendChild(row));
+
+        clearHighlights();
+        highlightColumn(columnIndex);
+        setupPagination(rowsPerPage);
+
+        if (asc) {
+            iconElement.classList.remove('bi-sort-alpha-down-alt');
+            iconElement.classList.add('bi-sort-alpha-down');
+        } else {
+            iconElement.classList.remove('bi-sort-alpha-down');
+            iconElement.classList.add('bi-sort-alpha-down-alt');
+        }
+    }
+
+    sortNameBtn.addEventListener('click', function() {
+        sortTable(1, nameAsc, nameSortIcon);
+        nameAsc = !nameAsc;
+    });
+
+    sortDayBtn.addEventListener('click', function() {
+        sortTable(3, dayAsc, daySortIcon);
+        dayAsc = !dayAsc;
+    });
+
+    setupPagination(rowsPerPage);
+</script>
+{% endblock %}
+
